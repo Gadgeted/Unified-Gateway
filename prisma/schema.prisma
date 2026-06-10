@@ -1,0 +1,105 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PaymentMethod {
+  MPESA
+  AIRTEL
+  CARD
+  CRYPTO
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+model Merchant {
+  id                String         @id @default(uuid())
+  businessName      String
+  email             String         @unique
+  apiKey            String         @unique // e.g., sk_live_...
+  
+  // Dynamic pricing structures per payment type
+  mpesaFeePercent   Float          @default(1.5)
+  airtelFeePercent  Float          @default(1.5)
+  cardFeePercent    Float          @default(2.9)
+  cryptoFeePercent  Float          @default(1.0)
+  
+  createdAt         DateTime       @default(now())
+  transactions      Transaction[]
+  inventory         Inventory[]
+  expenses          Expense[]      
+  salaries          Salary[]      
+  payouts           Payout[]
+}
+
+model Transaction {
+  id                String            @id @default(uuid())
+  merchantId        String
+  merchant          Merchant          @relation(fields: [merchantId], references: [id])
+  
+  amountGross       Float             // Full amount paid by customer (e.g. 10000)
+  processingFee     Float             // Our platform's cut calculated instantly
+  amountNet         Float             // Amount the merchant gets to keep
+  
+  currency          String            @default("KES")
+  paymentMethod     PaymentMethod
+  status            TransactionStatus @default(PENDING)
+  
+  customerIdentifier String           // Phone number, wallet address, or card token
+  merchantReference  String           // The invoice ID from the merchant's system
+  gatewayReference   String?           @unique // The ID returned by Safaricom/Airtel/Blockchain
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model Inventory {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  itemName    String
+  sku         String   @unique
+  stockCount  Int
+  price       Float
+  updatedAt   DateTime @updatedAt
+}
+
+
+model Expense {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  title       String   // e.g., "Electricity Bill", "Store Rent"
+  amount      Float
+  category    String   // e.g., "Utilities", "Logistics"
+  createdAt   DateTime @default(now())
+}
+
+model Salary {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  employeeName String
+  amount      Float
+  status      String   // e.g., "PAID", "PENDING"
+  paymentDate DateTime @default(now())
+}
+
+
+model Payout {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  amount      Float    // Amount requested for withdrawal
+  destination String   // Phone number or bank account number receiving funds
+  status      String   // PENDING, SUCCESS, or FAILED
+  createdAt   DateTime @default(now())
+}
