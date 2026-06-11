@@ -44,6 +44,13 @@ export class MpesaService {
     const passkey = process.env.MPESA_PASSKEY || '';
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
+    // 👈 DYNAMIC CALLBACK CONFIGURATION ROUTING
+    // Automatically uses your fresh ngrok domain and points to our new endpoint route
+    const liveNgrokTunnel = 'https://woozy-saggy-unzip.ngrok-free.dev';
+    const callbackUrl = `${liveNgrokTunnel}/v1/payments/mpesa-callback`;
+
+    this.logger.log(`Routing M-Pesa response lifecycle tracking to Callback URL: ${callbackUrl}`);
+
     const requestBody = {
       BusinessShortCode: shortcode,
       Password: password,
@@ -53,7 +60,7 @@ export class MpesaService {
       PartyA: phone,
       PartyB: shortcode,
       PhoneNumber: phone,
-      CallBackURL: process.env.MPESA_CALLBACK_URL,
+      CallBackURL: callbackUrl, // ◄ Safaricom will now hit your live tunnel
       AccountReference: transaction.merchantReference,
       TransactionDesc: `Payment for Order ${transaction.merchantReference}`,
     };
