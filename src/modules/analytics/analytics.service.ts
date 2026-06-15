@@ -1,66 +1,91 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TransactionStatus } from '@prisma/client';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  // 1. Fetch deep commercial metrics for a specific merchant
+  // 1. Existing or upgraded dashboard statistics calculation method
   async getMerchantDashboard(merchantId: string) {
-    const merchant = await this.prisma.merchant.findUnique({
-      where: { id: merchantId },
-    });
-
-    if (!merchant) throw new NotFoundException('Merchant record not found.');
-
-    // Fetch all successful transactions to compute real metrics
-    const successfulTx = await this.prisma.transaction.findMany({
+    // Fetch aggregate metrics for successful transactions matching this merchant
+    const successfulAggregates = await this.prisma.transaction.aggregate({
       where: {
         merchantId: merchantId,
-        status: TransactionStatus.SUCCESS,
+        status: 'SUCCESS',
+      },
+      _sum: {
+        amountGross: true,
+        processingFee: true,
+        amountNet: true,
+      },
+      _count: {
+        id: true,
       },
     });
 
-    // Run calculations across the ledger results
-    const totalGrossVolume = successfulTx.reduce((sum, tx) => sum + tx.amountGross, 0);
-    const totalPlatformFees = successfulTx.reduce((sum, tx) => sum + tx.processingFee, 0);
-    const totalMerchantNet = successfulTx.reduce((sum, tx) => sum + tx.amountNet, 0);
-
-    // Group transaction volumes by payment channel method
-    const breakdown = {
-      mpesa: successfulTx.filter(tx => tx.paymentMethod === 'MPESA').reduce((sum, tx) => sum + tx.amountGross, 0),
-      airtel: successfulTx.filter(tx => tx.paymentMethod === 'AIRTEL').reduce((sum, tx) => sum + tx.amountGross, 0),
-      card: successfulTx.filter(tx => tx.paymentMethod === 'CARD').reduce((sum, tx) => sum + tx.amountGross, 0),
-      crypto: successfulTx.filter(tx => tx.paymentMethod === 'CRYPTO').reduce((sum, tx) => sum + tx.amountGross, 0),
-    };
-
-    // Pull operational metrics from POS tracking tables
-    const totalExpenses = await this.prisma.expense.aggregate({
-      where: { merchantId },
-      _sum: { amount: true },
+    const failureCount = await this.prisma.transaction.count({
+      where: { 
+        merchantId: merchantId,
+        status: 'FAILED',
+      },
     });
 
-    const totalSalaries = await this.prisma.salary.aggregate({
-      where: { merchantId },
-      _sum: { amount: true },
+    const totalAttempts = (successfulAggregates._count.id || 0) + failureCount;
+    const successRate = totalAttempts > 0 
+      ? ((successfulAggregates._count.id || 0) / totalAttempts) * 100 
+      : 0;
+
+    // Generate rolling 7-day trend history chart coordinates
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const checkouts = await this.prisma.transaction.findMany({
+      where: {
+        merchantId: merchantId,
+        status: 'SUCCESS',
+        createdAt: { gte: sevenDaysAgo },
+      },
+      select: {
+        amountGross: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
     });
 
-    const expenseSum = totalExpenses._sum.amount || 0;
-    const salarySum = totalSalaries._sum.amount || 0;
+    const dailyVolumeMap: { [key: string]: number } = {};
+    checkouts.forEach((tx) => {
+      const dateKey = new Date(tx.createdAt).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      dailyVolumeMap[dateKey] = (dailyVolumeMap[dateKey] || 0) + tx.amountGross;
+    });
+
+    const chartData = Object.keys(dailyVolumeMap).map((date) => ({
+      date,
+      volume: dailyVolumeMap[date],
+    }));
 
     return {
-      businessName: merchant.businessName,
       metrics: {
-        totalGrossVolume,
-        platformFeesCollected: totalPlatformFees,
-        withdrawableBalance: totalMerchantNet,
-        totalBusinessExpenses: expenseSum,
-        totalEmployeeSalaries: salarySum,
-        netBusinessProfit: totalMerchantNet - (expenseSum + salarySum),
+        totalGrossVolume: successfulAggregates._sum.amountGross || 0,
+        totalFeesCollected: successfulAggregates._sum.processingFee || 0,
+        totalNetPayout: successfulAggregates._sum.amountNet || 0,
+        successfulTransactions: successfulAggregates._count.id || 0,
+        failedTransactions: failureCount,
+        successRate: parseFloat(successRate.toFixed(1)),
       },
-      channelVolumeDistribution: breakdown,
-      transactionCount: successfulTx.length,
+      chartData,
     };
+  }
+
+  // 2. Step 2 Execution Engine: Pulls scrolling real-time system logs
+  async getRecentMerchantTransactions(merchantId: string, limit: number) {
+    return this.prisma.transaction.findMany({
+      where: { merchantId: merchantId },
+      take: limit,
+      orderBy: { createdAt: 'desc' }, // Keeps freshest transactions on top
+    });
   }
 }

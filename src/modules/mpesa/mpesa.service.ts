@@ -46,8 +46,9 @@ export class MpesaService {
 
     // 👈 DYNAMIC CALLBACK CONFIGURATION ROUTING
     // Automatically uses your fresh ngrok domain and points to our new endpoint route
-    const liveNgrokTunnel = 'https://woozy-saggy-unzip.ngrok-free.dev';
-    const callbackUrl = `${liveNgrokTunnel}/v1/payments/mpesa-callback`;
+    // const liveNgrokTunnel = 'https://woozy-saggy-unzip.ngrok-free.dev';
+    // const callbackUrl = `${liveNgrokTunnel}/v1/payments/mpesa-callback`;
+    const callbackUrl = process.env.MPESA_CALLBACK_URL;
 
     this.logger.log(`Routing M-Pesa response lifecycle tracking to Callback URL: ${callbackUrl}`);
 

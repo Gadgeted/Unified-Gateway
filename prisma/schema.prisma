@@ -25,6 +25,7 @@ model Merchant {
   businessName      String
   email             String         @unique
   apiKey            String         @unique // e.g., sk_live_...
+  webhookUrl        String?        // Optional webhook destination URL
   
   // Dynamic pricing structures per payment type
   mpesaFeePercent   Float          @default(1.5)
