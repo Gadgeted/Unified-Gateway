@@ -9,6 +9,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3001', //  Unified Pay Frontend Dashboard
       'http://localhost:5173', //  Smart SME POS System Application
+      // Add more origins as needed
     ], // Allows your Next.js app to connect
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
