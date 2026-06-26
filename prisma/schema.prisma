@@ -42,24 +42,28 @@ model Merchant {
 }
 
 model Transaction {
-  id                String            @id @default(uuid())
-  merchantId        String
-  merchant          Merchant          @relation(fields: [merchantId], references: [id])
+  id                 String            @id @default(uuid())
+  merchantId         String
+  merchant           Merchant          @relation(fields: [merchantId], references: [id])
+  amountGross        Float
+  processingFee      Float
+  amountNet          Float
+  currency           String            @default("KES")
+  paymentMethod      PaymentMethod
+  status             TransactionStatus @default(PENDING)
+  customerIdentifier String            // Phone number, account, etc.
+  merchantReference  String            // The invoice/order reference from the POS
   
-  amountGross       Float             // Full amount paid by customer (e.g. 10000)
-  processingFee     Float             // Our platform's cut calculated instantly
-  amountNet         Float             // Amount the merchant gets to keep
+  // CHANGED: Distinguish between the upstream operational request ID and the verified carrier reference code
+  checkoutRequestId  String?           @unique // Captures Safaricom CheckoutRequestID or carrier handoff ID
+  gatewayReference   String?           @unique // Captures actual clear carrier code (e.g., M-Pesa TransID: QBB71A9XYZ)
   
-  currency          String            @default("KES")
-  paymentMethod     PaymentMethod
-  status            TransactionStatus @default(PENDING)
+  // NEW: Add support for tracking itemized metadata JSON snapshots directly inside the ledger
+  itemizedDetails    Json?             // Stores items payload: [{name, qty, unitPrice, subtotal}]
+  operatorId         Int?              // Links to Cashier / Operator who completed transaction
   
-  customerIdentifier String           // Phone number, wallet address, or card token
-  merchantReference  String           // The invoice ID from the merchant's system
-  gatewayReference   String?           @unique // The ID returned by Safaricom/Airtel/Blockchain
-  
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 }
 
 model Inventory {

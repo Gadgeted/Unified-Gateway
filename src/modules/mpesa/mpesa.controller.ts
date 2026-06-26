@@ -64,6 +64,33 @@ export class MpesaController {
       });
 
       this.logger.log(`Transaction ${transaction.id} successfully completed. Receipt: ${mpesaReceiptNumber}`);
+
+      // 5. 🚀 THE BRIDGE: Fire the webhook back to your Express POS Endpoint
+      try {
+        this.logger.log(`Communicating validation data back to POS backend for invoice: ${transaction.merchantReference}`);
+        
+        // This hits the working Express route you just shared
+        const posResponse = await fetch('http://localhost:5000/api/mpesa/callback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            invoice_reference: transaction.merchantReference, // Matches your resolvedInvoiceReference
+            mpesa_code: mpesaReceiptNumber,                  // Matches your resolvedTransactionCode
+            payment_channel: 'mpesa'                          // Matches your resolvedPaymentChannel
+          }),
+        });
+
+        if (posResponse.ok) {
+          this.logger.log(`[POS Synced] Express POS DB successfully updated for invoice ${transaction.merchantReference}`);
+        } else {
+          const errText = await posResponse.text();
+          this.logger.error(`[POS Sync Failed] POS server rejected sync payload: ${errText}`);
+        }
+      } catch (posError: any) {
+        this.logger.error(`[POS Connection Error] Could not connect to POS server: ${posError.message}`);
+      }
       
       // Tell Safaricom we received the data perfectly
       return { ResultCode: 0, ResultDesc: 'Callback processed successfully' };
