@@ -16,7 +16,9 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Accept, Authorization, x-api-key', // Explicitly allow your custom API key header
   });
 
-  await app.listen(3000);
-  console.log('🚀 Unified Gateway API running on http://localhost:3000');
+  // await app.listen(3000);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 Unified Gateway API running on http://localhost:${port}`);
 }
 bootstrap();
