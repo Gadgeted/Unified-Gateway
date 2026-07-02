@@ -88,4 +88,110 @@ export class AnalyticsService {
       orderBy: { createdAt: 'desc' }, // Keeps freshest transactions on top
     });
   }
+
+  async getAdminOverview() {
+    const totalMerchants = await this.prisma.merchant.count();
+    const totalTransactions = await this.prisma.transaction.count();
+    const successfulTransactions = await this.prisma.transaction.count({
+      where: { status: 'SUCCESS' },
+    });
+
+    const transactionAggregates = await this.prisma.transaction.aggregate({
+      _sum: {
+        amountGross: true,
+        processingFee: true,
+        amountNet: true,
+      },
+    });
+
+    const successRate = totalTransactions > 0
+      ? (successfulTransactions / totalTransactions) * 100
+      : 0;
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentSuccesses = await this.prisma.transaction.findMany({
+      where: {
+        status: 'SUCCESS',
+        createdAt: { gte: sevenDaysAgo },
+      },
+      select: {
+        amountGross: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const dailyVolumeMap: { [date: string]: number } = {};
+    recentSuccesses.forEach((tx) => {
+      const dateKey = new Date(tx.createdAt).toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      dailyVolumeMap[dateKey] = (dailyVolumeMap[dateKey] || 0) + tx.amountGross;
+    });
+
+    const chartData = Object.keys(dailyVolumeMap).map((date) => ({
+      date,
+      volume: dailyVolumeMap[date],
+    }));
+
+    return {
+      totalMerchants,
+      totalTransactions,
+      totalGrossVolume: transactionAggregates._sum.amountGross || 0,
+      totalFeesCollected: transactionAggregates._sum.processingFee || 0,
+      totalNetPayout: transactionAggregates._sum.amountNet || 0,
+      activeMerchants: totalMerchants,
+      successRate: parseFloat(successRate.toFixed(1)),
+      chartData,
+    };
+  }
+
+  async getAdminTenants() {
+    const transactionTotals = await this.prisma.transaction.groupBy({
+      by: ['merchantId'],
+      _count: { id: true },
+      _sum: { amountGross: true },
+    });
+
+    const totalsByMerchant = transactionTotals.reduce((map, item) => {
+      map[item.merchantId] = {
+        totalVolume: item._sum.amountGross || 0,
+        totalTransactions: item._count.id,
+      };
+      return map;
+    }, {} as Record<string, { totalVolume: number; totalTransactions: number }>);
+
+    const merchants = await this.prisma.merchant.findMany({
+      select: {
+        id: true,
+        businessName: true,
+        email: true,
+        apiKey: true,
+        createdAt: true,
+        mpesaFeePercent: true,
+        airtelFeePercent: true,
+        cardFeePercent: true,
+        cryptoFeePercent: true,
+      },
+    });
+
+    return merchants.map((merchant) => ({
+      id: merchant.id,
+      businessName: merchant.businessName,
+      email: merchant.email,
+      apiKey: merchant.apiKey,
+      createdAt: merchant.createdAt,
+      mpesaFeePercent: merchant.mpesaFeePercent,
+      airtelFeePercent: merchant.airtelFeePercent,
+      cardFeePercent: merchant.cardFeePercent,
+      cryptoFeePercent: merchant.cryptoFeePercent,
+      totalVolume: totalsByMerchant[merchant.id]?.totalVolume || 0,
+      totalTransactions: totalsByMerchant[merchant.id]?.totalTransactions || 0,
+      isActive: (totalsByMerchant[merchant.id]?.totalTransactions || 0) > 0,
+    }));
+  }
 }

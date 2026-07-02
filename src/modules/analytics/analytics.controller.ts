@@ -24,8 +24,34 @@ export class AnalyticsController {
   ) {
     const merchant = await this.validateMerchantKey(apiKey);
     const parsedLimit = parseInt(limit, 10) || 10;
-    
     return this.analyticsService.getRecentMerchantTransactions(merchant.id, parsedLimit);
+  }
+
+  // Route 3: Gateway administrator overview
+  @Get('admin/overview')
+  async fetchAdminOverview(@Headers('x-api-key') apiKey: string) {
+    this.validateAdminKey(apiKey);
+    return this.analyticsService.getAdminOverview();
+  }
+
+  // Alias route: some hosting platforms block paths containing `/admin`.
+  // Provide a safe alternate path that can be used by the frontend if /admin/* 404s.
+  @Get('overview-admin')
+  async fetchAdminOverviewAlias(@Headers('x-api-key') apiKey: string) {
+    return this.fetchAdminOverview(apiKey);
+  }
+
+  // Route 4: Gateway administrator tenant list
+  @Get('admin/tenants')
+  async fetchAdminTenants(@Headers('x-api-key') apiKey: string) {
+    this.validateAdminKey(apiKey);
+    return this.analyticsService.getAdminTenants();
+  }
+
+  // Alias route for tenant list to avoid hosting providers that rewrite/deny `/admin` paths
+  @Get('tenants-list')
+  async fetchAdminTenantsAlias(@Headers('x-api-key') apiKey: string) {
+    return this.fetchAdminTenants(apiKey);
   }
 
   // Private helper to avoid repeating auth logic across different dashboard paths
@@ -39,5 +65,16 @@ export class AnalyticsController {
     if (!merchant) throw new UnauthorizedException('Invalid API key provided.');
     
     return merchant;
+  }
+
+  private validateAdminKey(apiKey: string) {
+    if (!apiKey) throw new UnauthorizedException('Admin API key is required.');
+
+    const adminApiKey = process.env.ADMIN_API_KEY || 'tg_admin_secret_key_abc123';
+    if (apiKey !== adminApiKey) {
+      throw new UnauthorizedException('Invalid admin API key provided.');
+    }
+
+    return true;
   }
 }
