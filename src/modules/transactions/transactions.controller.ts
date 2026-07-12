@@ -1,9 +1,12 @@
 // file: src/modules/transactions/transactions.controller.ts
-import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, HttpStatus, Param, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, HttpStatus, Param, Logger, UseGuards } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreatePaymentDto } from './create-payment.dto';
+import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
+
 
 @Controller('v1/payments')
+@UseGuards(HybridAuthGuard) // Apply to all routes in this controller
 export class TransactionsController {
   private readonly logger = new Logger(TransactionsController.name);
 

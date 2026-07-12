@@ -20,12 +20,14 @@ export class TransactionsService {
     private cryptoService: CryptoService, 
   ) {}
 
-  async processIncomingPayment(dto: CreatePaymentDto, apiKey: string) {
-    const merchant = await this.prisma.merchant.findUnique({
-      where: { apiKey },
-    });
-
-    if (!merchant) throw new UnauthorizedException('Invalid API Key provided.');
+  async processIncomingPayment(dto: CreatePaymentDto, userContext: any) {
+  // If userContext.merchant exists, use it directly
+  let merchant = userContext.merchant;
+  if (!merchant && userContext.merchantId) {
+    // fallback: fetch merchant from DB if only id provided
+    merchant = await this.prisma.merchant.findUnique({ where: { id: userContext.merchantId } });
+  }
+  if (!merchant) throw new UnauthorizedException('Merchant not found');
 
     let feePercent = 0;
     switch (dto.paymentMethod) {

@@ -5,13 +5,15 @@ import { MpesaModule } from '../mpesa/mpesa.module'; // ◄ Import the M-Pesa mo
 import { AirtelModule } from '../airtel/airtel.module'; // ◄ Import Airtel Module
 import { CardModule } from '../cards/cards.module'; // ◄ Import Card Module
 import { CryptoModule } from '../crypto/crypto.module'; // ◄ Import Crypto Module
+import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard'; // ◄ import HybridAuthGuard
 
 @Module({
   imports: [
     MpesaModule,  // ◄  MpesaModule to imports list
     AirtelModule, // ◄  AirtelModule 
     CardModule,   // ◄  CardModule
-    CryptoModule // ◄  CryptoModule here
+    CryptoModule, // ◄  CryptoModule here
+    HybridAuthGuard // ◄ HybridAuthGuard here
   ], 
   controllers: [TransactionsController],
   providers: [TransactionsService],

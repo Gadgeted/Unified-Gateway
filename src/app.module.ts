@@ -8,35 +8,36 @@ import { CryptoModule } from './modules/crypto/crypto.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
-import { AnalyticsModule } from './modules/analytics/analytics.module'; 
-import { SettlementModule } from './modules/settlement/settlement.module'; 
-import { PrismaService } from './modules/prisma/prisma.service'; // ◄ Imported to handle seeding
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SettlementModule } from './modules/settlement/settlement.module';
+import { AuthModule } from './modules/auth/auth.module'; // <-- ADD
+import { PrismaService } from './modules/prisma/prisma.service';
 
 @Module({
   imports: [
-    MpesaModule, 
-    AirtelModule, 
-    CardModule, 
-    CryptoModule, 
-    InventoryModule, 
-    TransactionsModule, 
-    PrismaModule, 
-    AnalyticsModule, 
-    SettlementModule
+    MpesaModule,
+    AirtelModule,
+    CardModule,
+    CryptoModule,
+    InventoryModule,
+    TransactionsModule,
+    PrismaModule,
+    AnalyticsModule,
+    SettlementModule,
+    AuthModule, // <-- ADD
   ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule implements OnModuleInit {
-  // We inject the PrismaService right here so NestJS can use it as soon as the app starts
-  constructor(private prisma: PrismaService) {} 
+  constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
     console.log('🌱 Application booting up: Checking seed requirements...');
     try {
       const merchant = await this.prisma.merchant.upsert({
         where: { apiKey: 'tg_live_secret_key_abc123' },
-        update: {}, // If it already exists, do nothing
+        update: {},
         create: {
           id: 'test-merchant-uuid-1234',
           businessName: 'Maina Electronics & Spares',

@@ -26,6 +26,7 @@ model Merchant {
   email             String         @unique
   apiKey            String         @unique // e.g., sk_live_...
   webhookUrl        String?        // Optional webhook destination URL
+  users     User[]
   
   // Dynamic pricing structures per payment type
   mpesaFeePercent   Float          @default(1.5)
@@ -107,4 +108,23 @@ model Payout {
   destination String   // Phone number or bank account number receiving funds
   status      String   // PENDING, SUCCESS, or FAILED
   createdAt   DateTime @default(now())
+}
+
+
+// Add this to your schema.prisma
+enum UserRole {
+  GATEWAY_ADMIN
+  STORE_OWNER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // Hashed
+  role      UserRole @default(STORE_OWNER)
+  fullName  String
+  merchantId String? // Optional link to merchant
+  merchant  Merchant? @relation(fields: [merchantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
