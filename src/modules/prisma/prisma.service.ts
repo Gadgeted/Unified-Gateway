@@ -5,7 +5,6 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  user: any;
   private static getDatabaseUrl(): string {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
@@ -18,13 +17,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     adapter: new PrismaPg(PrismaService.getDatabaseUrl()),
   });
 
-  // Pass-through getters so your controllers and services don't break
+  // Pass-through getters
   get merchant() { return this.client.merchant; }
   get transaction() { return this.client.transaction; }
   get inventory() { return this.client.inventory; }
   get expense() { return this.client.expense; }
   get salary() { return this.client.salary; }
   get payout() { return this.client.payout; }
+  get user() { return this.client.user; }  
 
   async onModuleInit() {
     await this.client.$connect();
