@@ -32,6 +32,7 @@ export class HybridAuthGuard implements CanActivate {
         where: { apiKey: apiKey as string },
       });
       if (merchant) {
+        console.log(`🔐 Guard: Merchant found with API key ${apiKey}`);
         request.user = { merchant, role: 'STORE_OWNER' };
         return true;
       }
