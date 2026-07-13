@@ -40,7 +40,7 @@ export class HybridAuthGuard implements CanActivate {
     // 2. Try JWT (for web dashboard)
     if (token) {
       try {
-        const payload = this.jwtService.verify(token, { secret: process.env.JWT_SECRET || 'change_this_secret' });
+        const payload = this.jwtService.verify(token, { secret: process.env.JWT_SECRET || 'super_secret_gateway_key_for_development_2026' });
         const user = await this.prisma.user.findUnique({
           where: { id: payload.sub },
           include: { merchant: true },
