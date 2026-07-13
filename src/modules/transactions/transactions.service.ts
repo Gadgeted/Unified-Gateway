@@ -20,15 +20,31 @@ export class TransactionsService {
     private cryptoService: CryptoService, 
   ) {}
 
-  async processIncomingPayment(dto: CreatePaymentDto, userContext: any) {
-  // If userContext.merchant exists, use it directly
-  let merchant = userContext.merchant;
-  if (!merchant && userContext.merchantId) {
-    // fallback: fetch merchant from DB if only id provided
-    merchant = await this.prisma.merchant.findUnique({ where: { id: userContext.merchantId } });
-  }
-  if (!merchant) throw new UnauthorizedException('Merchant not found');
+  async processIncomingPayment(dto: CreatePaymentDto, userContext: any, apiKey?: string) {
+    this.logger.log(`Service received apiKey: ${apiKey}`);
+    this.logger.log(`Service received userContext: ${JSON.stringify(userContext)}`);
 
+    // 1. Try to get merchant from userContext (set by guard)
+    let merchant = userContext?.merchant;
+
+    // 2. If not, try by merchantId (if guard attached only ID)
+    if (!merchant && userContext?.merchantId) {
+      this.logger.log(`Fetching merchant by merchantId: ${userContext.merchantId}`);
+      merchant = await this.prisma.merchant.findUnique({ where: { id: userContext.merchantId } });
+    }
+
+    // 3. Final fallback: fetch by API key (for POS if guard didn't attach merchant)
+    if (!merchant && apiKey) {
+      this.logger.log(`Fallback: fetching merchant by API key: ${apiKey}`);
+      merchant = await this.prisma.merchant.findUnique({ where: { apiKey } });
+    }
+
+    if (!merchant) {
+      this.logger.error(`Merchant not found for apiKey: ${apiKey}`);
+      throw new UnauthorizedException('Merchant not found');
+    }
+
+    // --- Fee calculation ---
     let feePercent = 0;
     switch (dto.paymentMethod) {
       case PaymentMethod.MPESA: feePercent = merchant.mpesaFeePercent; break;
@@ -41,13 +57,13 @@ export class TransactionsService {
     const processingFee = (dto.amount * feePercent) / 100;
     const amountNet = dto.amount - processingFee;
 
-    // Capture the merchantReference directly from your POS tracking engine context
+    // --- Create transaction record ---
     const transaction = await this.prisma.transaction.create({
       data: {
         merchantId: merchant.id,
         amountGross: dto.amount,
-        processingFee: processingFee,
-        amountNet: amountNet,
+        processingFee,
+        amountNet,
         currency: dto.currency || 'KES',
         paymentMethod: dto.paymentMethod,
         status: TransactionStatus.PENDING,
@@ -136,6 +152,7 @@ export class TransactionsService {
     }
   }
 
+  // Sandbox simulation (unchanged)
   private async simulateSandboxPayment(transactionId: string, method: PaymentMethod) {
     const mockGatewayRef = `SANDBOX_MOCK_${Math.random().toString(36).substring(2, 11).toUpperCase()}`;
 
@@ -174,7 +191,7 @@ export class TransactionsService {
     };
   }
 
-  // Fixed Callback Worker mapping cleanly via 'gatewayReference' field
+  // Callback handlers (unchanged)
   async updateTransactionByCheckoutId(checkoutRequestId: string, finalStatus: 'SUCCESS' | 'FAILED', carrierCode: string | null) {
     this.logger.log(`Prisma updating Ledger for Checkout Request ID: ${checkoutRequestId} -> target: ${finalStatus}`);
     
@@ -203,12 +220,10 @@ export class TransactionsService {
     return updatedTransaction;
   }
 
-  // Retain legacy method format for structural tracking modules referencing it elsewhere
   async updateTransactionByGatewayRef(checkoutRequestId: string, finalStatus: 'SUCCESS' | 'FAILED') {
     return this.updateTransactionByCheckoutId(checkoutRequestId, finalStatus, null);
   }
 
-  // POS Shared Reference Query Mapping Anchor
   async getTransactionStatusByMerchantRef(merchantRef: string, apiKey: string) {
     const merchant = await this.prisma.merchant.findUnique({
       where: { apiKey },
@@ -237,7 +252,6 @@ export class TransactionsService {
     return transaction;
   }
 
-  // Automated instant status propagation engine
   private async dispatchWebhookNotification(url: string, transaction: any) {
     try {
       this.logger.log(`Dispatching transactional sync state event payload to merchant webhook: ${url}`);

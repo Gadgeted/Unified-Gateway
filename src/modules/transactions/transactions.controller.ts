@@ -1,12 +1,11 @@
 // file: src/modules/transactions/transactions.controller.ts
-import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, HttpStatus, Param, Logger, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Headers, UnauthorizedException, Get, HttpCode, HttpStatus, Param, Logger, UseGuards, Req } from '@nestjs/common';
 import { TransactionsService } from './transactions.service';
 import { CreatePaymentDto } from './create-payment.dto';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 
-
 @Controller('v1/payments')
-@UseGuards(HybridAuthGuard) // Apply to all routes in this controller
+@UseGuards(HybridAuthGuard)
 export class TransactionsController {
   private readonly logger = new Logger(TransactionsController.name);
 
@@ -15,12 +14,14 @@ export class TransactionsController {
   @Post()
   async InitiatePayment(
     @Body() createPaymentDto: CreatePaymentDto,
+    @Req() req: any,
     @Headers('x-api-key') apiKey: string,
   ) {
-    if (!apiKey) {
-      throw new UnauthorizedException('API key is missing.');
-    }
-    return this.transactionsService.processIncomingPayment(createPaymentDto, apiKey);
+    this.logger.log(`Incoming payment request, API Key header: ${apiKey}`);
+    this.logger.log(`User context from guard: ${JSON.stringify(req.user)}`);
+
+    // Pass both userContext and apiKey to the service
+    return this.transactionsService.processIncomingPayment(createPaymentDto, req.user, apiKey);
   }
 
   @Get('test')
@@ -62,18 +63,16 @@ export class TransactionsController {
       let carrierTransactionCode: string | null = null;
       const finalStatus = resultCode === 0 ? 'SUCCESS' : 'FAILED';
 
-      // Intercept Safaricom CallbackMetadata to parse out the real upstream M-Pesa Transaction Code
       if (resultCode === 0 && mpesaResponse.CallbackMetadata?.Item) {
         const items = mpesaResponse.CallbackMetadata.Item;
         const transactionItem = items.find((item: any) => item.Name === 'MpesaReceiptNumber');
         if (transactionItem) {
-          carrierTransactionCode = transactionItem.Value; // Holds the real code like QBB71A9XYZ
+          carrierTransactionCode = transactionItem.Value;
         }
       }
 
       this.logger.log(`Webhook hook triggered for CheckoutRequestID [${checkoutRequestId}] -> Status: ${finalStatus}, Code: ${carrierTransactionCode}`);
 
-      // Delegate status updates along with parsed carrier transaction reference code
       await this.transactionsService.updateTransactionByCheckoutId(
         checkoutRequestId, 
         finalStatus, 
