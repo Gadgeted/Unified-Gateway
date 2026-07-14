@@ -1,8 +1,10 @@
-import { Controller, Get, Headers, UnauthorizedException, Query } from '@nestjs/common';
+import { Controller, Get, Headers, UnauthorizedException, Query, UseGuards, Req } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 
 @Controller('v1/analytics')
+@UseGuards(HybridAuthGuard)
 export class AnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
@@ -11,70 +13,78 @@ export class AnalyticsController {
 
   // Route 1: Core Summary & Chart Analytics Data Base
   @Get('dashboard')
-  async fetchDashboardMetrics(@Headers('x-api-key') apiKey: string) {
-    const merchant = await this.validateMerchantKey(apiKey);
+  async fetchDashboardMetrics(@Req() req: any) {
+    // JWT or API key – we get merchant from req.user
+    const merchant = this.getMerchantFromRequest(req);
     return this.analyticsService.getMerchantDashboard(merchant.id);
   }
 
-  // Route 2: Real-time Live Transaction Feed Grid (Your Step 2 Code 🚀)
+  // Route 2: Real-time Live Transaction Feed
   @Get('recent-transactions')
   async fetchRecentTransactions(
-    @Headers('x-api-key') apiKey: string,
+    @Req() req: any,
     @Query('limit') limit = '10',
   ) {
-    const merchant = await this.validateMerchantKey(apiKey);
+    const merchant = this.getMerchantFromRequest(req);
     const parsedLimit = parseInt(limit, 10) || 10;
     return this.analyticsService.getRecentMerchantTransactions(merchant.id, parsedLimit);
   }
 
-  // Route 3: Gateway administrator overview
+  // Route 3: Gateway administrator overview (ADMIN ONLY)
   @Get('admin/overview')
-  async fetchAdminOverview(@Headers('x-api-key') apiKey: string) {
-    this.validateAdminKey(apiKey);
+  async fetchAdminOverview(@Req() req: any) {
+    this.ensureAdmin(req);
     return this.analyticsService.getAdminOverview();
   }
 
-  // Alias route: some hosting platforms block paths containing `/admin`.
-  // Provide a safe alternate path that can be used by the frontend if /admin/* 404s.
+  // Alias for admin overview
   @Get('overview-admin')
-  async fetchAdminOverviewAlias(@Headers('x-api-key') apiKey: string) {
-    return this.fetchAdminOverview(apiKey);
+  async fetchAdminOverviewAlias(@Req() req: any) {
+    return this.fetchAdminOverview(req);
   }
 
-  // Route 4: Gateway administrator tenant list
+  // Route 4: Gateway administrator tenant list (ADMIN ONLY)
   @Get('admin/tenants')
-  async fetchAdminTenants(@Headers('x-api-key') apiKey: string) {
-    this.validateAdminKey(apiKey);
+  async fetchAdminTenants(@Req() req: any) {
+    this.ensureAdmin(req);
     return this.analyticsService.getAdminTenants();
   }
 
-  // Alias route for tenant list to avoid hosting providers that rewrite/deny `/admin` paths
+  // Alias for tenant list
   @Get('tenants-list')
-  async fetchAdminTenantsAlias(@Headers('x-api-key') apiKey: string) {
-    return this.fetchAdminTenants(apiKey);
+  async fetchAdminTenantsAlias(@Req() req: any) {
+    return this.fetchAdminTenants(req);
   }
 
-  // Private helper to avoid repeating auth logic across different dashboard paths
-  private async validateMerchantKey(apiKey: string) {
-    if (!apiKey) throw new UnauthorizedException('API key header is required.');
+  // ----- private helpers -----
 
-    const merchant = await this.prisma.merchant.findUnique({
-      where: { apiKey },
-    });
-
-    if (!merchant) throw new UnauthorizedException('Invalid API key provided.');
-    
-    return merchant;
-  }
-
-  private validateAdminKey(apiKey: string) {
-    if (!apiKey) throw new UnauthorizedException('Admin API key is required.');
-
-    const adminApiKey = process.env.ADMIN_API_KEY || 'tg_admin_secret_key_abc123';
-    if (apiKey !== adminApiKey) {
-      throw new UnauthorizedException('Invalid admin API key provided.');
+  private getMerchantFromRequest(req: any) {
+    // If user is from JWT (has merchant attached)
+    if (req.user?.merchant) {
+      return req.user.merchant;
     }
+    // If user is from API key (merchant directly attached)
+    if (req.user?.merchant) {
+      return req.user.merchant;
+    }
+    // Fallback: if user has merchantId, fetch it
+    if (req.user?.merchantId) {
+      return this.prisma.merchant.findUnique({ where: { id: req.user.merchantId } });
+    }
+    throw new UnauthorizedException('Merchant not found in request context');
+  }
 
-    return true;
+  private ensureAdmin(req: any) {
+    if (req.user?.role !== 'GATEWAY_ADMIN') {
+      throw new UnauthorizedException('Admin access required');
+    }
+    // Also allow if user is admin via API key (isAdmin flag)
+    if (req.user?.isAdmin === true) {
+      return;
+    }
+    // If no admin role, reject
+    if (!req.user || req.user.role !== 'GATEWAY_ADMIN') {
+      throw new UnauthorizedException('Admin access required');
+    }
   }
 }
