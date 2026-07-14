@@ -195,23 +195,31 @@ export class AnalyticsService {
     }));
   }
 
-  async getMerchantTransactions(merchantId: string, limit: number = 50) {
+    async getMerchantTransactions(merchantId: string, limit: number = 50) {
     return this.prisma.transaction.findMany({
       where: { merchantId },
       orderBy: { createdAt: 'desc' },
       take: limit,
-      select: {
-        id: true,
-        merchantReference: true,
-        paymentMethod: true,
-        amountGross: true,
-        amountNet: true,
-        processingFee: true,
-        status: true,
-        createdAt: true,
-        gatewayReference: true,
-      },
+      // no select – returns all fields
     });
   }
+  // async getMerchantTransactions(merchantId: string, limit: number = 50) {
+  //   return this.prisma.transaction.findMany({
+  //     where: { merchantId },
+  //     orderBy: { createdAt: 'desc' },
+  //     take: limit,
+  //     select: {
+  //       id: true,
+  //       merchantReference: true,
+  //       paymentMethod: true,
+  //       amountGross: true,
+  //       amountNet: true,
+  //       processingFee: true,
+  //       status: true,
+  //       createdAt: true,
+  //       gatewayReference: true,
+  //     },
+  //   });
+  // }
 
 }
