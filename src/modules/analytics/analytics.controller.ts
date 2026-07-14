@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, UnauthorizedException, Query, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Headers, UnauthorizedException, Query, Param, Req, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
@@ -55,6 +55,21 @@ export class AnalyticsController {
   async fetchAdminTenantsAlias(@Req() req: any) {
     return this.fetchAdminTenants(req);
   }
+
+    @Get('admin/merchant/:merchantId/transactions')
+    @UseGuards(HybridAuthGuard)
+    async getMerchantTransactions(
+      @Param('merchantId') merchantId: string,
+      @Req() req: any,
+      @Query('limit') limit?: string,
+    ) {
+      // Only admin can access
+      if (req.user?.role !== 'GATEWAY_ADMIN') {
+        throw new UnauthorizedException('Admin access required.');
+      }
+      const parsedLimit = limit ? parseInt(limit, 10) : 50;
+      return this.analyticsService.getMerchantTransactions(merchantId, parsedLimit);
+    }
 
   // ----- private helpers -----
 
