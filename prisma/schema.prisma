@@ -21,26 +21,26 @@ enum TransactionStatus {
 }
 
 model Merchant {
-  id                String         @id @default(uuid())
-  businessName      String
-  email             String         @unique
-  apiKey            String         @unique // e.g., sk_live_...
-  webhookUrl        String?        // Optional webhook destination URL
-  users     User[]
-  tickets  Ticket[]
-  
+  id           String   @id @default(uuid())
+  businessName String
+  email        String   @unique
+  apiKey       String   @unique // e.g., sk_live_...
+  webhookUrl   String? // Optional webhook destination URL
+  users        User[]
+  tickets      Ticket[]
+
   // Dynamic pricing structures per payment type
-  mpesaFeePercent   Float          @default(1.5)
-  airtelFeePercent  Float          @default(1.5)
-  cardFeePercent    Float          @default(2.9)
-  cryptoFeePercent  Float          @default(1.0)
-  
-  createdAt         DateTime       @default(now())
-  transactions      Transaction[]
-  inventory         Inventory[]
-  expenses          Expense[]      
-  salaries          Salary[]      
-  payouts           Payout[]
+  mpesaFeePercent  Float @default(1.5)
+  airtelFeePercent Float @default(1.5)
+  cardFeePercent   Float @default(2.9)
+  cryptoFeePercent Float @default(1.0)
+
+  createdAt    DateTime      @default(now())
+  transactions Transaction[]
+  inventory    Inventory[]
+  expenses     Expense[]
+  salaries     Salary[]
+  payouts      Payout[]
 }
 
 model Transaction {
@@ -53,64 +53,61 @@ model Transaction {
   currency           String            @default("KES")
   paymentMethod      PaymentMethod
   status             TransactionStatus @default(PENDING)
-  customerIdentifier String            // Phone number, account, etc.
-  merchantReference  String            // The invoice/order reference from the POS
-  
+  customerIdentifier String // Phone number, account, etc.
+  merchantReference  String // The invoice/order reference from the POS
+
   // CHANGED: Distinguish between the upstream operational request ID and the verified carrier reference code
-  checkoutRequestId  String?           @unique // Captures Safaricom CheckoutRequestID or carrier handoff ID
-  gatewayReference   String?           @unique // Captures actual clear carrier code (e.g., M-Pesa TransID: QBB71A9XYZ)
-  
+  checkoutRequestId String? @unique // Captures Safaricom CheckoutRequestID or carrier handoff ID
+  gatewayReference  String? @unique // Captures actual clear carrier code (e.g., M-Pesa TransID: QBB71A9XYZ)
+
   // NEW: Add support for tracking itemized metadata JSON snapshots directly inside the ledger
-  itemizedDetails    Json?             // Stores items payload: [{name, qty, unitPrice, subtotal}]
-  operatorId         Int?              // Links to Cashier / Operator who completed transaction
-  
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
+  itemizedDetails Json? // Stores items payload: [{name, qty, unitPrice, subtotal}]
+  operatorId      Int? // Links to Cashier / Operator who completed transaction
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Inventory {
-  id          String   @id @default(uuid())
-  merchantId  String
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
-  itemName    String
-  sku         String   @unique
-  stockCount  Int
-  price       Float
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+  itemName   String
+  sku        String   @unique
+  stockCount Int
+  price      Float
+  updatedAt  DateTime @updatedAt
 }
 
-
 model Expense {
-  id          String   @id @default(uuid())
-  merchantId  String
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
-  title       String   // e.g., "Electricity Bill", "Store Rent"
-  amount      Float
-  category    String   // e.g., "Utilities", "Logistics"
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+  title      String // e.g., "Electricity Bill", "Store Rent"
+  amount     Float
+  category   String // e.g., "Utilities", "Logistics"
+  createdAt  DateTime @default(now())
 }
 
 model Salary {
-  id          String   @id @default(uuid())
-  merchantId  String
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  id           String   @id @default(uuid())
+  merchantId   String
+  merchant     Merchant @relation(fields: [merchantId], references: [id])
   employeeName String
-  amount      Float
-  status      String   // e.g., "PAID", "PENDING"
-  paymentDate DateTime @default(now())
+  amount       Float
+  status       String // e.g., "PAID", "PENDING"
+  paymentDate  DateTime @default(now())
 }
-
 
 model Payout {
   id          String   @id @default(uuid())
   merchantId  String
   merchant    Merchant @relation(fields: [merchantId], references: [id])
-  amount      Float    // Amount requested for withdrawal
-  destination String   // Phone number or bank account number receiving funds
-  status      String   // PENDING, SUCCESS, or FAILED
+  amount      Float // Amount requested for withdrawal
+  destination String // Phone number or bank account number receiving funds
+  status      String // PENDING, SUCCESS, or FAILED
   createdAt   DateTime @default(now())
 }
-
 
 // Add this to your schema.prisma
 enum UserRole {
@@ -119,26 +116,48 @@ enum UserRole {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String   // Hashed
-  role      UserRole @default(STORE_OWNER)
-  fullName  String
+  id         String    @id @default(uuid())
+  email      String    @unique
+  password   String // Hashed
+  role       UserRole  @default(STORE_OWNER)
+  fullName   String
   merchantId String? // Optional link to merchant
-  merchant  Merchant? @relation(fields: [merchantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  merchant   Merchant? @relation(fields: [merchantId], references: [id])
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Ticket {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   merchantId  String
-  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  merchant    Merchant        @relation(fields: [merchantId], references: [id])
   subject     String
   description String
-  status      String   @default("OPEN")
-  priority    String   @default("MEDIUM")
+  status      String          @default("OPEN")
+  priority    String          @default("MEDIUM")
   category    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  messages    TicketMessage[] // relation to messages
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String // User ID (admin or merchant)
+  ticketId  String? // optional link to ticket
+  message   String
+  type      String // TICKET_CREATED, TICKET_UPDATED, NEW_MESSAGE
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// ----- Support Tickets & Messaging -----
+model TicketMessage {
+  id         String   @id @default(uuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id])
+  senderId   String // User ID (admin or merchant)
+  senderType String // "ADMIN" or "MERCHANT"
+  message    String
+  createdAt  DateTime @default(now())
 }
