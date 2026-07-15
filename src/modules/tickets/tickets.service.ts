@@ -58,45 +58,44 @@ export class TicketsService {
     return updated;
   }
 
-  async addMessage(ticketId: string, senderId: string, senderType: 'ADMIN' | 'MERCHANT', message: string) {
-    // First, create the message
-    const msg = await this.prisma.ticketMessage.create({
-      data: { ticketId, senderId, senderType, message },
-    });
+    async addMessage(ticketId: string, senderId: string, senderType: 'ADMIN' | 'MERCHANT', message: string) {
+        // Create the message
+        const msg = await this.prisma.ticketMessage.create({
+            data: { ticketId, senderId, senderType, message },
+        });
 
-    // Fetch the ticket to get merchantId and subject
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { id: ticketId },
-      include: { merchant: true },
-    });
+        // Fetch the ticket to get merchantId and subject
+        const ticket = await this.prisma.ticket.findUnique({
+            where: { id: ticketId },
+            include: { merchant: true },
+        });
 
-    if (!ticket) {
-      throw new NotFoundException('Ticket not found');
-    }
+        if (!ticket) {
+            throw new NotFoundException('Ticket not found');
+        }
 
-    // Determine the recipient userId
-    let recipientUserId: string | null = null;
-    if (senderType === 'ADMIN') {
-      // Notify the merchant who owns the ticket
-      recipientUserId = ticket.merchantId;
-    } else {
-      // Notify all admins (or a specific admin user – we'll use the first admin found)
-      const adminUser = await this.prisma.user.findFirst({
-        where: { role: 'GATEWAY_ADMIN' },
-      });
-      if (adminUser) {
-        recipientUserId = adminUser.id;
-      }
-    }
+        // Determine recipient
+        let recipientUserId: string | null = null;
+        if (senderType === 'ADMIN') {
+            // Notify merchant
+            recipientUserId = ticket.merchantId;
+        } else {
+            // Notify all admins – we'll use the first admin found
+            const adminUser = await this.prisma.user.findFirst({
+            where: { role: 'GATEWAY_ADMIN' },
+            });
+            if (adminUser) {
+            recipientUserId = adminUser.id;
+            }
+            // If no admin found, we still proceed (maybe log a warning)
+        }
 
-    // Create notification for the recipient
-    if (recipientUserId) {
-      await this.createNotification(recipientUserId, ticketId, `New message on ticket "${ticket.subject}"`, 'NEW_MESSAGE');
-    }
+        if (recipientUserId) {
+            await this.createNotification(recipientUserId, ticketId, `New message on ticket "${ticket.subject}"`, 'NEW_MESSAGE');
+        }
 
-    return msg;
-  }
-
+        return msg;
+        }
   async getNotifications(userId: string) {
     return this.prisma.notification.findMany({
       where: { userId, isRead: false },

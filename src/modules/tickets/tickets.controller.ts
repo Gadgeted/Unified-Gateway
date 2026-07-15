@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Req, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Req, Query, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 
@@ -41,11 +41,13 @@ export class TicketsController {
 
   @Post(':id/messages')
   async addMessage(@Param('id') id: string, @Body() body: { message: string }, @Req() req: any) {
-    const userId = req.user?.id;
+
+    const userId = req.user?.userId;   // ✅ Use userId
     const role = req.user?.role;
     const senderType = role === 'GATEWAY_ADMIN' ? 'ADMIN' : 'MERCHANT';
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     return this.ticketsService.addMessage(id, userId, senderType, body.message);
-  }
+    }
 
   @Get('notifications')
   async getNotifications(@Req() req: any) {
