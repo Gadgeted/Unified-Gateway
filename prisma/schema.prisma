@@ -27,6 +27,7 @@ model Merchant {
   apiKey            String         @unique // e.g., sk_live_...
   webhookUrl        String?        // Optional webhook destination URL
   users     User[]
+  tickets  Ticket[]
   
   // Dynamic pricing structures per payment type
   mpesaFeePercent   Float          @default(1.5)
@@ -127,4 +128,17 @@ model User {
   merchant  Merchant? @relation(fields: [merchantId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Ticket {
+  id          String   @id @default(uuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  subject     String
+  description String
+  status      String   @default("OPEN")
+  priority    String   @default("MEDIUM")
+  category    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

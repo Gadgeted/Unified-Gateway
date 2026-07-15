@@ -12,6 +12,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { SettlementModule } from './modules/settlement/settlement.module';
 import { AuthModule } from './modules/auth/auth.module'; // <-- ADD
 import { PrismaService } from './modules/prisma/prisma.service';
+import { TicketsModule } from './modules/tickets/tickets.module';
 
 @Module({
   imports: [
@@ -24,7 +25,8 @@ import { PrismaService } from './modules/prisma/prisma.service';
     PrismaModule,
     AnalyticsModule,
     SettlementModule,
-    AuthModule, // <-- ADD
+    AuthModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
