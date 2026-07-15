@@ -23,6 +23,18 @@ export class TicketsController {
     return this.ticketsService.findAll(merchantId);
   }
 
+  // ✅ MOVED notifications routes BEFORE the :id routes
+  @Get('notifications')
+  async getNotifications(@Req() req: any) {
+    return this.ticketsService.getNotifications(req.user?.id);
+  }
+
+  @Patch('notifications/:id/read')
+  async markNotificationRead(@Param('id') id: string) {
+    return this.ticketsService.markNotificationRead(id);
+  }
+
+  // ✅ Now :id routes come AFTER the specific ones
   @Get(':id')
   async findOne(@Param('id') id: string, @Req() req: any) {
     const ticket = await this.ticketsService.findOneWithMessages(id);
@@ -41,21 +53,10 @@ export class TicketsController {
 
   @Post(':id/messages')
   async addMessage(@Param('id') id: string, @Body() body: { message: string }, @Req() req: any) {
-
-    const userId = req.user?.userId;   // ✅ Use userId
+    const userId = req.user?.userId;
     const role = req.user?.role;
     const senderType = role === 'GATEWAY_ADMIN' ? 'ADMIN' : 'MERCHANT';
     if (!userId) throw new UnauthorizedException('User not authenticated');
     return this.ticketsService.addMessage(id, userId, senderType, body.message);
-    }
-
-  @Get('notifications')
-  async getNotifications(@Req() req: any) {
-    return this.ticketsService.getNotifications(req.user?.id);
-  }
-
-  @Patch('notifications/:id/read')
-  async markNotificationRead(@Param('id') id: string) {
-    return this.ticketsService.markNotificationRead(id);
   }
 }
