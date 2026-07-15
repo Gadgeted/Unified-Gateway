@@ -17,8 +17,13 @@ export class TicketsService {
       },
     });
 
-    // Notify all admin users
-    await this.createNotification(null, ticket.id, `New ticket from merchant: ${ticket.subject}`, 'TICKET_CREATED');
+    // ✅ Call the class method – NOT defined inside!
+    await this.createNotification(
+      null,  // null = notify all admins
+      ticket.id,
+      `New ticket from merchant: ${ticket.subject}`,
+      'TICKET_CREATED'
+    );
 
     return ticket;
   }
@@ -51,51 +56,54 @@ export class TicketsService {
     });
 
     if (data.status) {
-      // Notify merchant if status changed
-      await this.createNotification(updated.merchantId, id, `Ticket "${updated.subject}" status updated to ${data.status}`, 'TICKET_UPDATED');
+      await this.createNotification(
+        updated.merchantId,
+        id,
+        `Ticket "${updated.subject}" status updated to ${data.status}`,
+        'TICKET_UPDATED'
+      );
     }
 
     return updated;
   }
 
-    async addMessage(ticketId: string, senderId: string, senderType: 'ADMIN' | 'MERCHANT', message: string) {
-        // Create the message
-        const msg = await this.prisma.ticketMessage.create({
-            data: { ticketId, senderId, senderType, message },
+  async addMessage(ticketId: string, senderId: string, senderType: 'ADMIN' | 'MERCHANT', message: string) {
+    const msg = await this.prisma.ticketMessage.create({
+      data: { ticketId, senderId, senderType, message },
+    });
+
+    const ticket = await this.prisma.ticket.findUnique({
+        where: { id: ticketId },  // ✅ CORRECT – use 'id'
         });
 
-        // Fetch the ticket to get merchantId and subject
-        const ticket = await this.prisma.ticket.findUnique({
-            where: { id: ticketId },
-            include: { merchant: true },
-        });
+    if (!ticket) {
+      throw new NotFoundException('Ticket not found');
+    }
 
-        if (!ticket) {
-            throw new NotFoundException('Ticket not found');
-        }
+    let recipientUserId: string | null = null;
+    if (senderType === 'ADMIN') {
+      recipientUserId = ticket.merchantId;
+    } else {
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'GATEWAY_ADMIN' },
+      });
+      if (adminUser) {
+        recipientUserId = adminUser.id;
+      }
+    }
 
-        // Determine recipient
-        let recipientUserId: string | null = null;
-        if (senderType === 'ADMIN') {
-            // Notify merchant
-            recipientUserId = ticket.merchantId;
-        } else {
-            // Notify all admins – we'll use the first admin found
-            const adminUser = await this.prisma.user.findFirst({
-            where: { role: 'GATEWAY_ADMIN' },
-            });
-            if (adminUser) {
-            recipientUserId = adminUser.id;
-            }
-            // If no admin found, we still proceed (maybe log a warning)
-        }
+    if (recipientUserId) {
+      await this.createNotification(
+        recipientUserId,
+        ticketId,
+        `New message on ticket "${ticket.subject}"`,
+        'NEW_MESSAGE'
+      );
+    }
 
-        if (recipientUserId) {
-            await this.createNotification(recipientUserId, ticketId, `New message on ticket "${ticket.subject}"`, 'NEW_MESSAGE');
-        }
+    return msg;
+  }
 
-        return msg;
-        }
   async getNotifications(userId: string) {
     return this.prisma.notification.findMany({
       where: { userId, isRead: false },
@@ -110,11 +118,12 @@ export class TicketsService {
     });
   }
 
-  // Internal helper to create a notification
+  // ✅ The helper method – defined once at the class level
   private async createNotification(userId: string | null, ticketId: string | null, message: string, type: string) {
+    console.log(`Creating notification: userId=${userId}, ticketId=${ticketId}, type=${type}`);
     if (!userId) {
-      // If no specific userId, notify all admin users (for ticket creation)
       const admins = await this.prisma.user.findMany({ where: { role: 'GATEWAY_ADMIN' } });
+      console.log(`Found ${admins.length} admins to notify`);
       for (const admin of admins) {
         await this.prisma.notification.create({
           data: { userId: admin.id, ticketId, message, type },
