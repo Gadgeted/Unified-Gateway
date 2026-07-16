@@ -14,8 +14,7 @@ export class AnalyticsController {
   // Route 1: Core Summary & Chart Analytics Data Base
   @Get('dashboard')
   async fetchDashboardMetrics(@Req() req: any) {
-    // JWT or API key – we get merchant from req.user
-    const merchant = this.getMerchantFromRequest(req);
+    const merchant = await this.getMerchantFromRequest(req);
     return this.analyticsService.getMerchantDashboard(merchant.id);
   }
 
@@ -25,7 +24,7 @@ export class AnalyticsController {
     @Req() req: any,
     @Query('limit') limit = '10',
   ) {
-    const merchant = this.getMerchantFromRequest(req);
+    const merchant = await this.getMerchantFromRequest(req);
     const parsedLimit = parseInt(limit, 10) || 10;
     return this.analyticsService.getRecentMerchantTransactions(merchant.id, parsedLimit);
   }
@@ -56,49 +55,50 @@ export class AnalyticsController {
     return this.fetchAdminTenants(req);
   }
 
-    @Get('admin/merchant/:merchantId/transactions')
-    @UseGuards(HybridAuthGuard)
-    async getMerchantTransactions(
-      @Param('merchantId') merchantId: string,
-      @Req() req: any,
-      @Query('limit') limit?: string,
-    ) {
-      // Only admin can access
-      if (req.user?.role !== 'GATEWAY_ADMIN') {
-        throw new UnauthorizedException('Admin access required.');
-      }
-      const parsedLimit = limit ? parseInt(limit, 10) : 50;
-      return this.analyticsService.getMerchantTransactions(merchantId, parsedLimit);
+  @Get('admin/merchant/:merchantId/transactions')
+  async getMerchantTransactions(
+    @Param('merchantId') merchantId: string,
+    @Req() req: any,
+    @Query('limit') limit?: string,
+  ) {
+    if (req.user?.role !== 'GATEWAY_ADMIN') {
+      throw new UnauthorizedException('Admin access required.');
     }
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
+    return this.analyticsService.getMerchantTransactions(merchantId, parsedLimit);
+  }
 
   // ----- private helpers -----
 
-  private getMerchantFromRequest(req: any) {
-    // If user is from JWT (has merchant attached)
+  private async getMerchantFromRequest(req: any) {
+    // 1️⃣ First, try to get merchant from the API key (highest priority)
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey) {
+      const merchant = await this.prisma.merchant.findUnique({
+        where: { apiKey: apiKey as string },
+      });
+      if (merchant) {
+        return merchant;
+      }
+    }
+
+    // 2️⃣ Fallback: if API key not provided, use the merchant from JWT
     if (req.user?.merchant) {
       return req.user.merchant;
     }
-    // If user is from API key (merchant directly attached)
-    if (req.user?.merchant) {
-      return req.user.merchant;
-    }
-    // Fallback: if user has merchantId, fetch it
+
     if (req.user?.merchantId) {
-      return this.prisma.merchant.findUnique({ where: { id: req.user.merchantId } });
+      const merchant = await this.prisma.merchant.findUnique({
+        where: { id: req.user.merchantId },
+      });
+      if (merchant) return merchant;
     }
-    throw new UnauthorizedException('Merchant not found in request context');
+
+    throw new UnauthorizedException('Merchant not found');
   }
 
   private ensureAdmin(req: any) {
-    if (req.user?.role !== 'GATEWAY_ADMIN') {
-      throw new UnauthorizedException('Admin access required');
-    }
-    // Also allow if user is admin via API key (isAdmin flag)
-    if (req.user?.isAdmin === true) {
-      return;
-    }
-    // If no admin role, reject
-    if (!req.user || req.user.role !== 'GATEWAY_ADMIN') {
+    if (req.user?.role !== 'GATEWAY_ADMIN' && req.user?.isAdmin !== true) {
       throw new UnauthorizedException('Admin access required');
     }
   }
