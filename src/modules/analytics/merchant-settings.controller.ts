@@ -6,7 +6,7 @@ import * as crypto from 'crypto';
 export class MerchantSettingsController {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 1. Fetch current settings
+  // 1. Fetch current settings securely
   @Get('settings')
   async getSettings(@Headers('x-api-key') apiKey: string) {
     const merchant = await this.validateKey(apiKey);
@@ -37,7 +37,7 @@ export class MerchantSettingsController {
     return { message: 'Webhook destination updated successfully.', webhookUrl: updated.webhookUrl };
   }
 
-  // 3. Rotate API Key
+  // 3. Roll / Regenerate API Key
   @Patch('settings/rotate-key')
   async rotateApiKey(@Headers('x-api-key') apiKey: string) {
     const merchant = await this.validateKey(apiKey);
@@ -49,7 +49,7 @@ export class MerchantSettingsController {
     return { message: 'API key successfully rotated.', newApiKey };
   }
 
-  // 4. Update Fee Settings (new)
+  // 4. Update fee percentages (for merchant)
   @Patch('settings/fees')
   async updateFees(
     @Headers('x-api-key') apiKey: string,
@@ -74,7 +74,7 @@ export class MerchantSettingsController {
     return { message: 'Fee settings updated successfully.', ...updated };
   }
 
-  // Private helper to validate API key
+  // Helper to validate API key
   private async validateKey(apiKey: string) {
     if (!apiKey) throw new UnauthorizedException('API key header is required.');
     const merchant = await this.prisma.merchant.findUnique({
