@@ -1,4 +1,4 @@
-import { Controller, Post, Body, BadRequestException, Get, Patch, Param, UseGuards, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, BadRequestException, Get, Patch, Param, UseGuards, Req, UnauthorizedException, Query } from '@nestjs/common';
 import { SettlementService } from './settlement.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
@@ -82,6 +82,20 @@ export class SettlementController {
       await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
       return { message: 'Payout rejected.' };
     }
+  }
+
+  @Get('payouts')
+  async getAllPayouts(@Req() req: any, @Query('status') status?: string) {
+    this.ensureAdmin(req);
+    const where: any = {};
+    if (status && ['PENDING', 'SUCCESS', 'FAILED'].includes(status)) {
+      where.status = status;
+    }
+    return this.prisma.payout.findMany({
+      where,
+      include: { merchant: { select: { businessName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // ----- helpers -----
