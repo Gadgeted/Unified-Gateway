@@ -1,22 +1,17 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { SettlementService } from './settlement.service';
 import { SettlementController } from './settlement.controller';
+import { MpesaModule } from '../mpesa/mpesa.module'; // ✅ import MpesaModule
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 
 @Module({
   imports: [
-    PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'super_secret_gateway_key_for_development_2026',
-      signOptions: { expiresIn: '7d' },
-    }),
+    MpesaModule, // ✅ makes B2cService available
   ],
   controllers: [SettlementController],
   providers: [
     SettlementService,
-    HybridAuthGuard,   // ✅ now JwtService is available
+    HybridAuthGuard,
   ],
   exports: [SettlementService],
 })
