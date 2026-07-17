@@ -67,4 +67,11 @@ export class SettlementService {
       throw new InternalServerErrorException('Disbursement service failed to process network payout.');
     }
   }
+
+  async getMerchantPayouts(merchantId: string) {
+    return this.prisma.payout.findMany({
+      where: { merchantId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 }
