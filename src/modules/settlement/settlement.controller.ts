@@ -3,7 +3,7 @@ import { SettlementService } from './settlement.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 import { B2cService } from '../mpesa/b2c.service';
-import { TicketsService } from '../tickets/tickets.service';   // ✅ import
+import { TicketsService } from '../tickets/tickets.service';
 
 @Controller('v1/settlement')
 @UseGuards(HybridAuthGuard)
@@ -12,7 +12,7 @@ export class SettlementController {
     private readonly settlementService: SettlementService,
     private readonly prisma: PrismaService,
     private readonly b2cService: B2cService,
-    private readonly ticketsService: TicketsService,   // ✅ inject
+    private readonly ticketsService: TicketsService,
   ) {}
 
   @Get('balance')
@@ -50,9 +50,9 @@ export class SettlementController {
       },
     });
 
-    // 🔔 Notify all admins
+    // Notify all admins
     await this.ticketsService.createNotification(
-      null, // null = all admins
+      null,
       null,
       `💳 New withdrawal request of KES ${body.amount} from ${merchant.businessName}`,
       'WITHDRAWAL_REQUESTED'
@@ -84,7 +84,7 @@ export class SettlementController {
     });
     if (!payout) throw new BadRequestException('Payout not found');
 
-    // Find the merchant's user ID (for notification)
+    // Find the merchant's user (to notify them)
     const merchantUser = await this.prisma.user.findFirst({
       where: { merchantId: payout.merchantId },
     });
@@ -92,10 +92,11 @@ export class SettlementController {
 
     if (body.status === 'SUCCESS') {
       try {
+        // Send B2C payment
         await this.b2cService.sendMoney(payout.amount, payout.destination, payout.merchant.businessName);
         await this.prisma.payout.update({ where: { id }, data: { status: 'SUCCESS' } });
 
-        // 🔔 Notify merchant
+        // Notify merchant
         if (merchantUserId) {
           await this.ticketsService.createNotification(
             merchantUserId,
@@ -106,8 +107,8 @@ export class SettlementController {
         }
         return { message: 'Payout approved and sent to merchant.' };
       } catch (err) {
+        // If B2C fails, mark as FAILED
         await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
-        // 🔔 Notify merchant of failure
         if (merchantUserId) {
           await this.ticketsService.createNotification(
             merchantUserId,
@@ -119,8 +120,8 @@ export class SettlementController {
         throw new BadRequestException('B2C failed. Payout marked FAILED.');
       }
     } else {
+      // Rejected
       await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
-      // 🔔 Notify merchant of rejection
       if (merchantUserId) {
         await this.ticketsService.createNotification(
           merchantUserId,
@@ -136,7 +137,7 @@ export class SettlementController {
   // ----- helpers -----
 
   private async getMerchantFromRequest(req: any) {
-    // 1️⃣ Try API key first
+    // 1️⃣ Try API key first (POS/dashboard)
     const apiKey = req.headers['x-api-key'];
     if (apiKey) {
       const merchant = await this.prisma.merchant.findUnique({
