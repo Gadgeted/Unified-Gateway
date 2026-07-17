@@ -119,7 +119,7 @@ export class TicketsService {
   }
 
   // ✅ The helper method – defined once at the class level
-  private async createNotification(userId: string | null, ticketId: string | null, message: string, type: string) {
+  public async createNotification(userId: string | null, ticketId: string | null, message: string, type: string) {
     console.log(`Creating notification: userId=${userId}, ticketId=${ticketId}, type=${type}`);
     if (!userId) {
       const admins = await this.prisma.user.findMany({ where: { role: 'GATEWAY_ADMIN' } });

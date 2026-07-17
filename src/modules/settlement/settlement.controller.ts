@@ -3,6 +3,7 @@ import { SettlementService } from './settlement.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 import { B2cService } from '../mpesa/b2c.service';
+import { TicketsService } from '../tickets/tickets.service';   // ✅ import
 
 @Controller('v1/settlement')
 @UseGuards(HybridAuthGuard)
@@ -11,6 +12,7 @@ export class SettlementController {
     private readonly settlementService: SettlementService,
     private readonly prisma: PrismaService,
     private readonly b2cService: B2cService,
+    private readonly ticketsService: TicketsService,   // ✅ inject
   ) {}
 
   @Get('balance')
@@ -47,41 +49,16 @@ export class SettlementController {
         status: 'PENDING',
       },
     });
+
+    // 🔔 Notify all admins
+    await this.ticketsService.createNotification(
+      null, // null = all admins
+      null,
+      `💳 New withdrawal request of KES ${body.amount} from ${merchant.businessName}`,
+      'WITHDRAWAL_REQUESTED'
+    );
+
     return { message: 'Withdrawal request submitted.', payout };
-  }
-
-  @Get('pending')
-  async getPendingPayouts(@Req() req: any) {
-    this.ensureAdmin(req);
-    return this.prisma.payout.findMany({
-      where: { status: 'PENDING' },
-      include: { merchant: { select: { businessName: true, email: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-  }
-
-  @Patch('payouts/:id')
-  async updatePayoutStatus(@Param('id') id: string, @Body() body: { status: 'SUCCESS' | 'FAILED' }, @Req() req: any) {
-    this.ensureAdmin(req);
-    const payout = await this.prisma.payout.findUnique({
-      where: { id },
-      include: { merchant: true },
-    });
-    if (!payout) throw new BadRequestException('Payout not found');
-
-    if (body.status === 'SUCCESS') {
-      try {
-        await this.b2cService.sendMoney(payout.amount, payout.destination, payout.merchant.businessName);
-        await this.prisma.payout.update({ where: { id }, data: { status: 'SUCCESS' } });
-        return { message: 'Payout approved and sent to merchant.' };
-      } catch (err) {
-        await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
-        throw new BadRequestException('B2C failed. Payout marked FAILED.');
-      }
-    } else {
-      await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
-      return { message: 'Payout rejected.' };
-    }
   }
 
   @Get('payouts')
@@ -96,6 +73,64 @@ export class SettlementController {
       include: { merchant: { select: { businessName: true, email: true } } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  @Patch('payouts/:id')
+  async updatePayoutStatus(@Param('id') id: string, @Body() body: { status: 'SUCCESS' | 'FAILED' }, @Req() req: any) {
+    this.ensureAdmin(req);
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      include: { merchant: true },
+    });
+    if (!payout) throw new BadRequestException('Payout not found');
+
+    // Find the merchant's user ID (for notification)
+    const merchantUser = await this.prisma.user.findFirst({
+      where: { merchantId: payout.merchantId },
+    });
+    const merchantUserId = merchantUser?.id;
+
+    if (body.status === 'SUCCESS') {
+      try {
+        await this.b2cService.sendMoney(payout.amount, payout.destination, payout.merchant.businessName);
+        await this.prisma.payout.update({ where: { id }, data: { status: 'SUCCESS' } });
+
+        // 🔔 Notify merchant
+        if (merchantUserId) {
+          await this.ticketsService.createNotification(
+            merchantUserId,
+            null,
+            `✅ Withdrawal of KES ${payout.amount} approved! Funds have been sent to ${payout.destination}.`,
+            'WITHDRAWAL_APPROVED'
+          );
+        }
+        return { message: 'Payout approved and sent to merchant.' };
+      } catch (err) {
+        await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
+        // 🔔 Notify merchant of failure
+        if (merchantUserId) {
+          await this.ticketsService.createNotification(
+            merchantUserId,
+            null,
+            `❌ Withdrawal of KES ${payout.amount} failed. Please contact support.`,
+            'WITHDRAWAL_FAILED'
+          );
+        }
+        throw new BadRequestException('B2C failed. Payout marked FAILED.');
+      }
+    } else {
+      await this.prisma.payout.update({ where: { id }, data: { status: 'FAILED' } });
+      // 🔔 Notify merchant of rejection
+      if (merchantUserId) {
+        await this.ticketsService.createNotification(
+          merchantUserId,
+          null,
+          `❌ Withdrawal of KES ${payout.amount} was rejected. Please contact support.`,
+          'WITHDRAWAL_REJECTED'
+        );
+      }
+      return { message: 'Payout rejected.' };
+    }
   }
 
   // ----- helpers -----

@@ -4,11 +4,13 @@ import { PassportModule } from '@nestjs/passport';
 import { SettlementService } from './settlement.service';
 import { SettlementController } from './settlement.controller';
 import { MpesaModule } from '../mpesa/mpesa.module';
+import { TicketsModule } from '../tickets/tickets.module'; 
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
 
 @Module({
   imports: [
     MpesaModule,
+    TicketsModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'super_secret_gateway_key_for_development_2026',
