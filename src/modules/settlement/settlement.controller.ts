@@ -2,6 +2,7 @@ import { Controller, Post, Body, Headers, UnauthorizedException, BadRequestExcep
 import { SettlementService } from './settlement.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
+import { B2cService } from '../mpesa/b2c.service';
 
 @Controller('v1/settlement')
 @UseGuards(HybridAuthGuard)
@@ -9,6 +10,7 @@ export class SettlementController {
   constructor(
     private readonly settlementService: SettlementService,
     private readonly prisma: PrismaService,
+    private readonly b2cService: B2cService,
   ) {}
 
   // Merchant requests withdrawal (creates PENDING payout)
@@ -64,26 +66,36 @@ export class SettlementController {
   }
 
   // Admin: approve or reject payout
-  @Patch('payouts/:id')
+ @Patch('payouts/:id')
   async updatePayoutStatus(
     @Param('id') id: string,
     @Body() body: { status: 'SUCCESS' | 'FAILED' },
     @Req() req: any,
   ) {
     this.ensureAdmin(req);
-    const payout = await this.prisma.payout.findUnique({ where: { id } });
+    const payout = await this.prisma.payout.findUnique({
+      where: { id },
+      include: { merchant: true },
+    });
     if (!payout) throw new BadRequestException('Payout not found');
 
-    // If approving, trigger B2C
     if (body.status === 'SUCCESS') {
-      // Note: you can call a service to send money here
-      // For now, we'll just update status
-      await this.prisma.payout.update({
-        where: { id },
-        data: { status: 'SUCCESS' },
-      });
-      // Optionally trigger B2C here
-      return { message: 'Payout approved.' };
+      // Trigger B2C
+      try {
+        await this.b2cService.sendMoney(payout.amount, payout.destination, payout.merchant.businessName);
+        await this.prisma.payout.update({
+          where: { id },
+          data: { status: 'SUCCESS' },
+        });
+        return { message: 'Payout approved and sent to merchant.' };
+      } catch (err) {
+        // If B2C fails, keep as PENDING or mark FAILED
+        await this.prisma.payout.update({
+          where: { id },
+          data: { status: 'FAILED' },
+        });
+        throw new BadRequestException('B2C failed. Payout marked FAILED.');
+      }
     } else {
       await this.prisma.payout.update({
         where: { id },
@@ -123,5 +135,10 @@ export class SettlementController {
     if (req.user?.role !== 'GATEWAY_ADMIN' && req.user?.isAdmin !== true) {
       throw new UnauthorizedException('Admin access required');
     }
+  }
+  @Get('balance')
+  async getBalance(@Req() req: any) {
+    const merchant = await this.getMerchantFromRequest(req);
+    return this.settlementService.getBalance(merchant.id);
   }
 }

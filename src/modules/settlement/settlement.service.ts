@@ -74,4 +74,29 @@ export class SettlementService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async getBalance(merchantId: string) {
+    // Total net from successful transactions
+    const total = await this.prisma.transaction.aggregate({
+      where: { merchantId, status: 'SUCCESS' },
+      _sum: { amountNet: true },
+    });
+    const totalEarned = total._sum.amountNet || 0;
+
+    // Total already withdrawn (successful payouts)
+    const withdrawn = await this.prisma.payout.aggregate({
+      where: { merchantId, status: 'SUCCESS' },
+      _sum: { amount: true },
+    });
+    const totalWithdrawn = withdrawn._sum.amount || 0;
+
+    return {
+      grossVolume: totalEarned + totalWithdrawn, // total gross before fees
+      fees: totalEarned > 0 ? (await this.prisma.transaction.aggregate({
+        where: { merchantId, status: 'SUCCESS' },
+        _sum: { processingFee: true },
+      }))._sum.processingFee || 0 : 0,
+      withdrawable: totalEarned - totalWithdrawn,
+    };
+  }
 }
