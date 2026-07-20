@@ -36,7 +36,7 @@ export class B2cService {
   if (formattedPhone.startsWith('+')) formattedPhone = formattedPhone.slice(1);
 
   // ✅ Build callback URLs correctly
-  const baseUrl = (process.env.MPESA_CALLBACK_URL || 'https://unified-gateway.onrender.com').replace(/\/+$/, '');
+  const baseUrl = (process.env.MPESA_CALLBACK_URL || 'https://woozy-saggy-unzip.ngrok-free.dev').replace(/\/+$/, '');
   const timeoutUrl = `${baseUrl}/v1/mpesa/b2c/timeout`;
   const resultUrl = `${baseUrl}/v1/mpesa/b2c/result`;
 
