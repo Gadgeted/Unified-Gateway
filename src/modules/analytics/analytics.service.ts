@@ -204,7 +204,7 @@ export class AnalyticsService {
     });
   }
 
-  async getAllTransactions(limit: number) {
+  async getAllTransactions(limit: number = 100) {
     return this.prisma.transaction.findMany({
       take: limit,
       orderBy: { createdAt: 'desc' },
