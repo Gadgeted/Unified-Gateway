@@ -13,6 +13,7 @@ import { SettlementModule } from './modules/settlement/settlement.module';
 import { AuthModule } from './modules/auth/auth.module'; // <-- ADD
 import { PrismaService } from './modules/prisma/prisma.service';
 import { TicketsModule } from './modules/tickets/tickets.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { TicketsModule } from './modules/tickets/tickets.module';
     SettlementModule,
     AuthModule,
     TicketsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

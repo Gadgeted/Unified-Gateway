@@ -161,3 +161,9 @@ model TicketMessage {
   message    String
   createdAt  DateTime @default(now())
 }
+
+model GlobalSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String // JSON string or string value
+}
