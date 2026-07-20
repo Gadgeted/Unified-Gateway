@@ -98,6 +98,7 @@ export class MpesaController {
   async handleB2cResult(@Body() body: any) {
     this.logger.log('📩 B2C Result Callback received', body);
     try {
+      const result = body.Result || body;
       const resultCode = body.ResultCode; // 0 = success
       const transactionId = body.TransactionID;
       const resultDesc = body.ResultDesc;
