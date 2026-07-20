@@ -195,12 +195,20 @@ export class AnalyticsService {
     }));
   }
 
-    async getMerchantTransactions(merchantId: string, limit: number = 50) {
+  async getMerchantTransactions(merchantId: string, limit: number = 50) {
     return this.prisma.transaction.findMany({
       where: { merchantId },
       orderBy: { createdAt: 'desc' },
       take: limit,
       // no select – returns all fields
+    });
+  }
+
+  async getAllTransactions(limit: number) {
+    return this.prisma.transaction.findMany({
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: { merchant: { select: { businessName: true } } },
     });
   }
   // async getMerchantTransactions(merchantId: string, limit: number = 50) {

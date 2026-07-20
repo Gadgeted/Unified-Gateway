@@ -68,6 +68,15 @@ export class AnalyticsController {
     return this.analyticsService.getMerchantTransactions(merchantId, parsedLimit);
   }
 
+    // ✅ NEW: Admin transactions (all merchants)
+  @Get('admin/transactions')
+  async getAdminTransactions(@Req() req: any, @Query('limit') limit?: string) {
+    this.ensureAdmin(req);
+    const take = limit ? parseInt(limit, 10) : 100;
+    return this.analyticsService.getAllTransactions(take);
+  }
+
+
   // ----- private helpers -----
 
   private async getMerchantFromRequest(req: any) {

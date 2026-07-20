@@ -5,7 +5,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  globalSetting: any;
+  get globalSetting() { return this.client.globalSetting; }
   private static getDatabaseUrl(): string {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
