@@ -50,7 +50,7 @@ export class MpesaService {
     // const callbackUrl = `${liveNgrokTunnel}/v1/payments/mpesa-callback`;
     // const callbackUrl = process.env.MPESA_CALLBACK_URL;
     const baseUrl = (process.env.MPESA_CALLBACK_URL || 'https://unified-gateway.onrender.com').replace(/\/+$/, '');
-    const callbackUrl = `${baseUrl}/v1/payments/mpesa-callback`;
+    const callbackUrl = `${baseUrl}/v1/mpesa/callback`;
 
     this.logger.log(`Routing M-Pesa response lifecycle tracking to Callback URL: ${callbackUrl}`);
 
