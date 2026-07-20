@@ -12,6 +12,7 @@ export class MpesaIpGuard implements CanActivate {
     '196.201.214.207',
     '196.201.214.208',
     '196.46.255.24',
+    '196.201.212.138', 
     '::ffff:196.201.214.200', // IPv6 mapped formats
     '::ffff:196.201.214.206',
     '::ffff:196.201.213.114'
