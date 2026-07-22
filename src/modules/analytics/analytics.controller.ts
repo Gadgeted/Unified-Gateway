@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, UnauthorizedException, Query, Param, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Headers, UnauthorizedException, Query, Param, Req, UseGuards, Post } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HybridAuthGuard } from '../../common/guards/hybrid-auth.guard';
@@ -55,20 +55,19 @@ export class AnalyticsController {
     return this.fetchAdminTenants(req);
   }
 
+  // Get transactions for a specific merchant (ADMIN ONLY)
   @Get('admin/merchant/:merchantId/transactions')
   async getMerchantTransactions(
     @Param('merchantId') merchantId: string,
     @Req() req: any,
     @Query('limit') limit?: string,
   ) {
-    if (req.user?.role !== 'GATEWAY_ADMIN') {
-      throw new UnauthorizedException('Admin access required.');
-    }
+    this.ensureAdmin(req);
     const parsedLimit = limit ? parseInt(limit, 10) : 50;
     return this.analyticsService.getMerchantTransactions(merchantId, parsedLimit);
   }
 
-    // ✅ NEW: Admin transactions (all merchants)
+  // Get all transactions for admin
   @Get('admin/transactions')
   async getAdminTransactions(@Req() req: any, @Query('limit') limit?: string) {
     this.ensureAdmin(req);
@@ -76,12 +75,13 @@ export class AnalyticsController {
     return this.analyticsService.getAllTransactions(take);
   }
 
+  // ✅ NEW: settle-now placeholder endpoint
   @Post('admin/settle-now')
   async settleNow(@Req() req: any) {
     this.ensureAdmin(req);
-    return { message: 'Settlement run triggered.' };
+    // Placeholder – implement actual settlement logic later
+    return { message: 'Settlement run triggered (placeholder).' };
   }
-
 
   // ----- private helpers -----
 
@@ -92,9 +92,7 @@ export class AnalyticsController {
       const merchant = await this.prisma.merchant.findUnique({
         where: { apiKey: apiKey as string },
       });
-      if (merchant) {
-        return merchant;
-      }
+      if (merchant) return merchant;
     }
 
     // 2️⃣ Fallback: if API key not provided, use the merchant from JWT
