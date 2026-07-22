@@ -45,7 +45,7 @@ export class B2cService {
     SecurityCredential: process.env.MPESA_SECURITY_CREDENTIAL || '',
     CommandID: 'BusinessPayment',
     Amount: Math.round(amount),
-    PartyA: shortcode,
+    PartyA: process.env.MPESA_SHORTCODE || '174379',
     PartyB: formattedPhone,
     Remarks: 'Withdrawal payout',
     QueueTimeOutURL: timeoutUrl,

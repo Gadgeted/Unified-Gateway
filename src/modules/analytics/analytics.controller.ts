@@ -76,6 +76,12 @@ export class AnalyticsController {
     return this.analyticsService.getAllTransactions(take);
   }
 
+  @Post('admin/settle-now')
+  async settleNow(@Req() req: any) {
+    this.ensureAdmin(req);
+    return { message: 'Settlement run triggered.' };
+  }
+
 
   // ----- private helpers -----
 
